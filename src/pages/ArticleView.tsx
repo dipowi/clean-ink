@@ -108,7 +108,7 @@ export default function ArticleView() {
           </header>
 
           <div 
-            className="article-content text-lg leading-relaxed"
+            className="article-content"
             dangerouslySetInnerHTML={{ __html: article.content }}
           />
         </article>
