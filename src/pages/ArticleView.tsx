@@ -99,10 +99,10 @@ export default function ArticleView() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-[730px] mx-auto px-6 py-12">
+      <div className="max-w-[708px] mx-auto px-6 py-24">
         <article>
-          <header className="mb-8">
-            <h1 className="text-4xl font-bold text-foreground mb-6 leading-tight tracking-tight">
+          <header className="mb-12">
+            <h1 className="text-[40px] font-bold text-foreground mb-4 leading-[1.2] tracking-[-0.01em]">
               {article.title}
             </h1>
           </header>
