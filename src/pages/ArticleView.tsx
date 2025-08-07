@@ -99,49 +99,19 @@ export default function ArticleView() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-[730px] mx-auto px-4 py-8">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate('/')}
-          className="mb-8 hover:bg-muted"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to home
-        </Button>
-
+      <div className="max-w-[730px] mx-auto px-6 py-12">
         <article>
-          <header className="mb-8">
-            <h1 className="text-4xl font-bold text-foreground mb-4 leading-tight">
+          <header className="mb-12">
+            <h1 className="text-5xl font-bold text-foreground mb-8 leading-[1.1] tracking-tight">
               {article.title}
             </h1>
-            
-            <div className="flex items-center gap-4 text-sm text-muted-foreground border-b border-border pb-4">
-              <span>{formatDate(article.created_at)}</span>
-              {article.author_name && <span>by {article.author_name}</span>}
-              <div className="flex items-center gap-1">
-                <Eye className="w-4 h-4" />
-                <span>{article.view_count + 1} views</span>
-              </div>
-            </div>
           </header>
 
           <div 
-            className="article-content"
+            className="article-content text-lg leading-relaxed"
             dangerouslySetInnerHTML={{ __html: article.content }}
           />
         </article>
-
-        <footer className="mt-12 pt-8 border-t border-border">
-          <div className="text-center">
-            <Button 
-              onClick={() => navigate('/post')}
-              variant="outline"
-              className="mx-auto"
-            >
-              Create Your Own Article
-            </Button>
-          </div>
-        </footer>
       </div>
     </div>
   );
