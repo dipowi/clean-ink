@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      absensup: {
+        Row: {
+          created_at: string
+          data: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          id?: string
+        }
+        Relationships: []
+      }
       articles: {
         Row: {
           author_name: string | null
