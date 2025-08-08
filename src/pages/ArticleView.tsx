@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft } from "lucide-react";
+import "./article-overrides.css";
 
 interface Article {
   id: string;
@@ -86,13 +87,33 @@ export default function ArticleView() {
 
   const optimizedContent = useMemo(() => optimizeArticleHTML(article?.content || ''), [article?.content]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading article...</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!article) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = article.content || '';
+    const text = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+    const description = text.slice(0, 160);
+
+    document.title = article.title;
+
+    let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'description';
+      document.head.appendChild(meta);
+    }
+    meta.content = description;
+
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.rel = 'canonical';
+      document.head.appendChild(canonical);
+    }
+    canonical.href = window.location.href;
+  }, [article]);
+
+  if (loading) return null;
 
   if (error || !article) {
     return (
@@ -113,7 +134,7 @@ export default function ArticleView() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full max-w-[820px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-20">
+      <div className="w-full max-w-[880px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-20">
         <article>
           <header className="mb-8 md:mb-10">
             <h1 className="text-[30px] sm:text-[34px] md:text-[44px] font-bold text-foreground mb-4 md:mb-5 leading-[1.25] tracking-[-0.01em]">
