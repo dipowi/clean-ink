@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Eye } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 interface Article {
   id: string;
@@ -69,13 +69,27 @@ export default function ArticleView() {
     });
   };
 
+  const optimizeArticleHTML = (html: string) => {
+    if (!html) return '';
+    try {
+      // Lazy load images
+      html = html.replace(/<img\s/gi, '<img loading="lazy" decoding="async" fetchpriority="low" referrerpolicy="no-referrer-when-downgrade" ');
+      // Lazy load iframes
+      html = html.replace(/<iframe\s/gi, '<iframe loading="lazy" ');
+      // Optimize videos
+      html = html.replace(/<video\s/gi, '<video preload="metadata" ');
+      return html;
+    } catch {
+      return html;
+    }
+  };
+
+  const optimizedContent = useMemo(() => optimizeArticleHTML(article?.content || ''), [article?.content]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading article...</p>
-        </div>
+        <p className="text-muted-foreground">Loading article...</p>
       </div>
     );
   }
@@ -99,17 +113,17 @@ export default function ArticleView() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-[730px] mx-auto px-6 py-16 md:px-8 md:py-24">
+      <div className="w-full max-w-[820px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-20">
         <article>
           <header className="mb-8 md:mb-10">
-            <h1 className="text-[28px] md:text-[40px] font-bold text-foreground mb-3 md:mb-4 leading-[1.2] tracking-[-0.01em]">
+            <h1 className="text-[30px] sm:text-[34px] md:text-[44px] font-bold text-foreground mb-4 md:mb-5 leading-[1.25] tracking-[-0.01em]">
               {article.title}
             </h1>
           </header>
 
           <div 
-            className="article-content"
-            dangerouslySetInnerHTML={{ __html: article.content }}
+            className="article-content text-[17px] md:text-[18px] leading-8 md:leading-9"
+            dangerouslySetInnerHTML={{ __html: optimizedContent }}
           />
         </article>
       </div>
