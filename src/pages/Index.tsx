@@ -19,7 +19,11 @@ const Index = () => {
           <div className="border border-border rounded-lg p-10 bg-card/50">
             <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-3">WELCOME TO SUSU.MY.ID</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Halaman depan yang bersih dan profesional. Tidak ada tautan—cukup sapaan hangat. Selamat membaca.
+              Sebuah ruang untuk berbagi karya dan gagasan oleh <a
+                href="https://www.facebook.com/didin.prasetyawan"
+                className="underline underline-offset-4 hover:text-primary transition-colors"
+                target="_blank" rel="noopener noreferrer"
+              >Didin Prasetyawan</a>.
             </p>
           </div>
         </section>
