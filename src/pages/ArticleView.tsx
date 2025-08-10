@@ -1,8 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import "./article-overrides.css";
 
 interface Article {
@@ -15,13 +16,21 @@ interface Article {
   view_count: number;
 }
 
+interface TocItem {
+  id: string;
+  text: string;
+  level: number; // 2 for h2, 3 for h3
+}
+
 export default function ArticleView() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const [article, setArticle] = useState<Article | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+const [article, setArticle] = useState<Article | null>(null);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+const [toc, setToc] = useState<TocItem[]>([]);
+const [activeId, setActiveId] = useState<string | null>(null);
+const contentRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!slug) return;
 
@@ -70,24 +79,107 @@ export default function ArticleView() {
     });
   };
 
-  const optimizeArticleHTML = (html: string) => {
-    if (!html) return '';
-    try {
-      // Lazy load images
-      html = html.replace(/<img\s/gi, '<img loading="lazy" decoding="async" fetchpriority="low" referrerpolicy="no-referrer-when-downgrade" ');
-      // Lazy load iframes
-      html = html.replace(/<iframe\s/gi, '<iframe loading="lazy" ');
-      // Optimize videos
-      html = html.replace(/<video\s/gi, '<video preload="metadata" ');
-      return html;
-    } catch {
-      return html;
-    }
-  };
+const optimizeArticleHTML = (html: string) => {
+  if (!html) return '';
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const body = doc.body;
 
-  const optimizedContent = useMemo(() => optimizeArticleHTML(article?.content || ''), [article?.content]);
+    // Unwrap <font> tags but keep their children
+    body.querySelectorAll('font').forEach((el) => {
+      const parent = el.parentNode;
+      if (!parent) return;
+      while (el.firstChild) {
+        parent.insertBefore(el.firstChild, el);
+      }
+      parent.removeChild(el);
+    });
 
-  useEffect(() => {
+    // Remove inline font declarations to enforce site font
+    body.querySelectorAll('[style]').forEach((el) => {
+      const element = el as HTMLElement;
+      element.style.removeProperty('font');
+      element.style.removeProperty('font-family');
+      element.style.removeProperty('font-size');
+      if (!element.getAttribute('style') || element.getAttribute('style')?.trim() === '') {
+        element.removeAttribute('style');
+      }
+    });
+
+    // Optimize images
+    body.querySelectorAll('img').forEach((img) => {
+      img.setAttribute('loading', 'lazy');
+      img.setAttribute('decoding', 'async');
+      img.setAttribute('fetchpriority', 'low');
+      img.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
+      img.removeAttribute('width');
+      img.removeAttribute('height');
+      const prev = img.getAttribute('style') || '';
+      img.setAttribute('style', `${prev}${prev && !prev.trim().endsWith(';') ? ';' : ''}height:auto;`);
+    });
+
+    // Optimize iframes
+    body.querySelectorAll('iframe').forEach((ifr) => {
+      ifr.setAttribute('loading', 'lazy');
+    });
+
+    // Optimize videos
+    body.querySelectorAll('video').forEach((vid) => {
+      vid.setAttribute('preload', 'metadata');
+    });
+
+    // Ensure headings have stable IDs for TOC
+    const slugify = (s: string) =>
+      s.toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-');
+
+    body.querySelectorAll('h2, h3').forEach((h) => {
+      if (!h.id || h.id.trim() === '') {
+        const text = h.textContent || 'section';
+        h.id = slugify(text);
+      }
+    });
+
+    return body.innerHTML;
+  } catch {
+    // Fallback: regex-only optimizations
+    html = html.replace(/<img\s/gi, '<img loading="lazy" decoding="async" fetchpriority="low" referrerpolicy="no-referrer-when-downgrade" ');
+    html = html.replace(/<iframe\s/gi, '<iframe loading="lazy" ');
+    html = html.replace(/<video\s/gi, '<video preload="metadata" ');
+    html = html.replace(/<\/?font[^>]*>/gi, '');
+    html = html.replace(/font-family:[^;\"]*;?/gi, '').replace(/font-size:[^;\"]*;?/gi, '');
+    return html;
+  }
+};
+
+const extractTOC = (html: string): TocItem[] => {
+  if (!html) return [];
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const items: TocItem[] = [];
+    doc.querySelectorAll('h2, h3').forEach((el) => {
+      items.push({
+        id: (el as HTMLElement).id || '',
+        text: (el.textContent || '').trim(),
+        level: el.tagName.toLowerCase() === 'h3' ? 3 : 2,
+      });
+    });
+    return items;
+  } catch {
+    return [];
+  }
+};
+
+const optimizedContent = useMemo(() => optimizeArticleHTML(article?.content || ''), [article?.content]);
+
+useEffect(() => {
+  setToc(extractTOC(optimizedContent));
+}, [optimizedContent]);
+
+useEffect(() => {
     if (!article) return;
     const tmp = document.createElement('div');
     tmp.innerHTML = article.content || '';
@@ -111,9 +203,24 @@ export default function ArticleView() {
       document.head.appendChild(canonical);
     }
     canonical.href = window.location.href;
-  }, [article]);
+}, [article]);
 
-  if (loading) return null;
+useEffect(() => {
+  if (!contentRef.current) return;
+  const headings = Array.from(contentRef.current.querySelectorAll('h2, h3')) as HTMLElement[];
+  if (headings.length === 0) return;
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        setActiveId(entry.target.id);
+      }
+    });
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0.1 });
+  headings.forEach((h) => observer.observe(h));
+  return () => observer.disconnect();
+}, [optimizedContent]);
+
+if (loading) return null;
 
   if (error || !article) {
     return (
@@ -132,22 +239,92 @@ export default function ArticleView() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="w-full max-w-[880px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-20">
-        <article>
-          <header className="mb-8 md:mb-10">
-            <h1 className="text-[32px] sm:text-[36px] md:text-[48px] font-bold text-foreground mb-4 md:mb-6 leading-[1.2] tracking-[-0.01em]">
-              {article.title}
-            </h1>
-          </header>
+return (
+  <div className="min-h-screen bg-background">
+    <div className="w-full max-w-[1200px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-20">
+      <article>
+        <header className="mb-6 md:mb-8">
+          <h1 className="text-[32px] sm:text-[36px] md:text-[46px] font-bold text-foreground mb-2 md:mb-4 leading-[1.2] tracking-[-0.01em]">
+            {article.title}
+          </h1>
+        </header>
 
+        {toc.length > 0 && (
+          <div className="lg:hidden mb-6">
+            <Accordion type="single" collapsible>
+              <AccordionItem value="toc">
+                <AccordionTrigger className="text-base">Daftar Isi</AccordionTrigger>
+                <AccordionContent>
+                  <nav aria-label="Daftar Isi" className="text-sm">
+                    <ul className="space-y-1">
+                      {toc.map((item) => (
+                        <li key={item.id} className={item.level === 3 ? 'pl-4' : ''}>
+                          <button
+                            className="text-left text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => {
+                              const el = document.getElementById(item.id);
+                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                          >
+                            {item.text}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+        )}
+
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
           <div 
-            className="article-content text-[17px] md:text-[18px] leading-8 md:leading-9"
+            ref={contentRef}
+            className="article-content text-[18px] md:text-[19px] leading-8 md:leading-9"
             dangerouslySetInnerHTML={{ __html: optimizedContent }}
           />
-        </article>
-      </div>
+          {toc.length > 0 && (
+            <aside className="hidden lg:block">
+              <div className="sticky top-24">
+                <nav aria-label="Table of contents" className="text-sm">
+                  <p className="mb-2 font-medium text-foreground">Daftar Isi</p>
+                  <ul className="space-y-1">
+                    {toc.map((item) => (
+                      <li key={item.id} className={item.level === 3 ? 'pl-4' : ''}>
+                        <button
+                          className={`text-left transition-colors ${activeId === item.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                          onClick={() => {
+                            const el = document.getElementById(item.id);
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }}
+                        >
+                          {item.text}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              </div>
+            </aside>
+          )}
+        </div>
+      </article>
     </div>
-  );
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: article.title,
+          datePublished: article.created_at,
+          author: article.author_name ? { "@type": "Person", name: article.author_name } : undefined,
+          mainEntityOfPage: { "@type": "WebPage", "@id": window.location.href },
+          inLanguage: "id-ID",
+        }),
+      }}
+    />
+  </div>
+);
 }
