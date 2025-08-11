@@ -201,7 +201,7 @@ return (
   <div className="min-h-screen bg-background">
     <div className="w-full max-w-[1200px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-20">
       <article>
-        <header className="mb-6 md:mb-8 text-center">
+        <header className="mb-6 md:mb-8 text-left">
           <h1 className="text-[32px] sm:text-[36px] md:text-[46px] font-bold text-foreground mb-2 md:mb-4 leading-[1.2] tracking-[-0.01em]">
             {article.title}
           </h1>
