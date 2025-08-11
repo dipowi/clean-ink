@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
 import "./article-overrides.css";
 
 interface Article {
@@ -16,11 +16,6 @@ interface Article {
   view_count: number;
 }
 
-interface TocItem {
-  id: string;
-  text: string;
-  level: number; // 2 for h2, 3 for h3
-}
 
 export default function ArticleView() {
   const { slug } = useParams();
@@ -28,9 +23,6 @@ export default function ArticleView() {
 const [article, setArticle] = useState<Article | null>(null);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState<string | null>(null);
-const [toc, setToc] = useState<TocItem[]>([]);
-const [activeId, setActiveId] = useState<string | null>(null);
-const contentRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!slug) return;
 
@@ -155,29 +147,9 @@ const optimizeArticleHTML = (html: string) => {
   }
 };
 
-const extractTOC = (html: string): TocItem[] => {
-  if (!html) return [];
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const items: TocItem[] = [];
-    doc.querySelectorAll('h2, h3').forEach((el) => {
-      items.push({
-        id: (el as HTMLElement).id || '',
-        text: (el.textContent || '').trim(),
-        level: el.tagName.toLowerCase() === 'h3' ? 3 : 2,
-      });
-    });
-    return items;
-  } catch {
-    return [];
-  }
-};
 
 const optimizedContent = useMemo(() => optimizeArticleHTML(article?.content || ''), [article?.content]);
 
-useEffect(() => {
-  setToc(extractTOC(optimizedContent));
-}, [optimizedContent]);
 
 useEffect(() => {
     if (!article) return;
@@ -205,20 +177,6 @@ useEffect(() => {
     canonical.href = window.location.href;
 }, [article]);
 
-useEffect(() => {
-  if (!contentRef.current) return;
-  const headings = Array.from(contentRef.current.querySelectorAll('h2, h3')) as HTMLElement[];
-  if (headings.length === 0) return;
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        setActiveId(entry.target.id);
-      }
-    });
-  }, { rootMargin: '0px 0px -70% 0px', threshold: 0.1 });
-  headings.forEach((h) => observer.observe(h));
-  return () => observer.disconnect();
-}, [optimizedContent]);
 
 if (loading) return null;
 
@@ -243,72 +201,17 @@ return (
   <div className="min-h-screen bg-background">
     <div className="w-full max-w-[1200px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-20">
       <article>
-        <header className="mb-6 md:mb-8">
+        <header className="mb-6 md:mb-8 text-center">
           <h1 className="text-[32px] sm:text-[36px] md:text-[46px] font-bold text-foreground mb-2 md:mb-4 leading-[1.2] tracking-[-0.01em]">
             {article.title}
           </h1>
         </header>
 
-        {toc.length > 0 && (
-          <div className="lg:hidden mb-6">
-            <Accordion type="single" collapsible>
-              <AccordionItem value="toc">
-                <AccordionTrigger className="text-base">Daftar Isi</AccordionTrigger>
-                <AccordionContent>
-                  <nav aria-label="Daftar Isi" className="text-sm">
-                    <ul className="space-y-1">
-                      {toc.map((item) => (
-                        <li key={item.id} className={item.level === 3 ? 'pl-4' : ''}>
-                          <button
-                            className="text-left text-muted-foreground hover:text-foreground transition-colors"
-                            onClick={() => {
-                              const el = document.getElementById(item.id);
-                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }}
-                          >
-                            {item.text}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </nav>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </div>
-        )}
 
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
-          <div 
-            ref={contentRef}
-            className="article-content text-[18px] md:text-[19px] leading-8 md:leading-9"
-            dangerouslySetInnerHTML={{ __html: optimizedContent }}
-          />
-          {toc.length > 0 && (
-            <aside className="hidden lg:block">
-              <div className="sticky top-24">
-                <nav aria-label="Table of contents" className="text-sm">
-                  <p className="mb-2 font-medium text-foreground">Daftar Isi</p>
-                  <ul className="space-y-1">
-                    {toc.map((item) => (
-                      <li key={item.id} className={item.level === 3 ? 'pl-4' : ''}>
-                        <button
-                          className={`text-left transition-colors ${activeId === item.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                          onClick={() => {
-                            const el = document.getElementById(item.id);
-                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          }}
-                        >
-                          {item.text}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              </div>
-            </aside>
-          )}
-        </div>
+        <div
+          className="article-content text-[18px] md:text-[19px] leading-8 md:leading-9"
+          dangerouslySetInnerHTML={{ __html: optimizedContent }}
+        />
       </article>
     </div>
     <script
